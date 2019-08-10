@@ -9,6 +9,7 @@ In order to run the programs contained in this repository you need at least Pyth
 - scipy
 - pillow
 - csv
+- threading
 
 There should be eight Python files, three .jpg files, and one .txt file. I will now list the Python files and their purpose.
 
