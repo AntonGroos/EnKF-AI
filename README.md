@@ -1,5 +1,5 @@
 # EnKF-AI
-This repository contains Python 3 implementaitions of ensemble Kalman Filters with adaptive covariance inflation.
+This repository contains Python 3 implementaitions of ensemble Kalman Filters with adaptive covariance inflation. Note that the programms in this repository were made to highlight catastrophic filter divergence, thus they are not very efficient and sometimes diliberatly inefficient in choice of some variables.
 
 In order to run the programs contained in this repository you need at least Python 3.7 and following modules:
 
@@ -11,7 +11,7 @@ In order to run the programs contained in this repository you need at least Pyth
 - csv
 - threading
 
-There should be eight Python files, three .jpg files, and one .txt file. I will now list the Python files and their purpose.
+There should be eight Python files, three .jpg files, and one .txt file. I will now list the Python files and their purpose:
 
 equilibrium.py given a turbulence regime F the programm starts N = 100 long running simulations of the Lorenz 96 model to and calculates the equilibrium mean, the variance of each node, and the benchmark Error_A. 
 
@@ -27,6 +27,7 @@ tests.py this file contains the GUI. Executing it will open a window letting the
 
 plotfilters.py uses the Error_matrix.txt to create long time simmulations of each filter, it uses a slightly modified version of the other filter programms (as a function in plotfilters.py) to allow the same measurement errors for all filter for a more accurate comparison. It is also the programm I used to create plots with two filters at the same time for my thesis (if you just want to see the plot set N=1 in the programm). 
 
+More detailed explanations can be found in each of the programms.
 
 
 
