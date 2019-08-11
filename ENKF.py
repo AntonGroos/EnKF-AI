@@ -43,7 +43,6 @@ def runge_kutta(stepnumber, delta, x0, F):
 def explicit_euler(stepnumber, delta, x0, F):
 
 
-	#print(f'stepnumber: {stepnumber}. delta: {delta}')
 	d         = len(x0)
 	x_new     = np.zeros(d)
 	x_old     = x0 
@@ -59,6 +58,11 @@ def explicit_euler(stepnumber, delta, x0, F):
 
 def integrate(integration_scheme, stepsize, start, stepnumber, t, h, F):
 
+	'''
+	This function formats it's input into a shape, that will be accepted from the choosen
+	integration scheme.
+	'''
+
 	if integration_scheme == 'euler':
 
 		return explicit_euler(stepnumber, stepsize, start, F)
@@ -68,8 +72,8 @@ def integrate(integration_scheme, stepsize, start, stepnumber, t, h, F):
 		return runge_kutta(stepnumber, stepsize, start, F)
 
 	else:
+
 		temp  = t*h
-		#temp1 = np.arange(temp, temp + stepsize*stepnumber, stepsize)
 		temp1 = np.linspace(temp, temp + stepsize*stepnumber, stepnumber)
 
 		return np.transpose(odeint(Lorenz96,start,temp1, args = (F,)))[:,stepnumber-1]
@@ -80,9 +84,13 @@ def integrate(integration_scheme, stepsize, start, stepnumber, t, h, F):
 #---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-# This function is the basic Kalman filter, I saves all process outcomes into an d x K x N matrix.
-
 def my_EnKF(Z, H, start, measure_noise, T, K, d, q, delta, integration_scheme, obs, F):
+
+	'''
+	This function is the base of the ensemble kalman filter, it in each iteration it calls the functions
+	forecast and analysis to simulate to filter. During this function we also collect all sorts of usefull
+	statistics.
+	'''
 
 	process = start
 	h       = obs*delta
