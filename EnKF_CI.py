@@ -52,10 +52,12 @@ def explicit_euler(stepnumber, delta, x0, F):
 	return x_new
 
 
-
-
-
 def integrate(integration_scheme, stepsize, start, stepnumber, t, h, F):
+
+	'''
+	This function formats it's input into a shape, that will be accepted from the choosen
+	integration scheme.
+	'''
 
 	if integration_scheme == 'euler':
 
@@ -79,9 +81,13 @@ def integrate(integration_scheme, stepsize, start, stepnumber, t, h, F):
 #---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-# This function is the basic Kalman filter, I saves all process outcomes into an d x K x N matrix.
-
 def my_EnKF(Z, H, start, measure_noise, T, K, d, q, delta, integration_scheme, obs, F):
+
+	'''
+	This function is the base of the ensemble kalman filter, it in each iteration it calls the functions
+	forecast and analysis to simulate to filter. During this function we also collect all sorts of usefull
+	statistics.
+	'''
 
 	process = start
 	h       = obs*delta

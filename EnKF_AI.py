@@ -58,8 +58,12 @@ def explicit_euler(stepnumber, delta, x0, F):
 
 
 
-# This function will use a specified integration scheme to calculate the numeric integral of the Lorenz96 model
 def integrate(integration_scheme, stepsize, start, stepnumber, t, h, F):
+
+	'''
+	This function formats it's input into a shape, that will be accepted from the choosen
+	integration scheme.
+	'''
 
 	if integration_scheme == 'euler':
 
@@ -83,8 +87,14 @@ def integrate(integration_scheme, stepsize, start, stepnumber, t, h, F):
 #---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-# This function is the basic Kalman filter, I saves the mean value of the ensemble in a (d,T) matrix.
+
 def my_EnKF(Z, H, start, measure_noise, T, K, d, q, delta, integration_scheme, obs, F):
+
+	'''
+	This function is the base of the ensemble kalman filter, it in each iteration it calls the functions
+	forecast and analysis to simulate to filter. During this function we also collect all sorts of usefull
+	statistics.
+	'''
 
 	M1, M2  = get_thresholds(F, q)
 	process = start
@@ -112,9 +122,10 @@ def my_EnKF(Z, H, start, measure_noise, T, K, d, q, delta, integration_scheme, o
 		Theta, Xi  = get_greek(V_hat, Z_ens, H, d, K, q)
 		lambda_adap = 0 
 
-		# We only want to save the data for Xi and Theta after the filter has stabilized
+		# We only want to save the data for Xi and Theta after the filter has stabilized. The sqrt() is because in this code we actually compare 
+		# Theta^2 with M_1^2.
 		if t > T//2:
-			average_Theta +=  Theta
+			average_Theta +=  np.sqrt(Theta)
 			average_Xi    += Xi 
 
 		# Triggers adaptive inflation, if necessary
@@ -220,6 +231,7 @@ def get_thresholds(F, q):
 
 	F = 4, 8, 16
 	q = 1,2,3,4,5
+	d = 5
 
 	any other values will go back to a default value, results may vary.
 	'''
@@ -232,23 +244,23 @@ def get_thresholds(F, q):
 
 		elif q == 2:
 
-			M1 = 22.45
-			M2 = 7.47
+			M1 = 17.02
+			M2 = 4.21
 
 		elif q == 3:
 
-			M1 = 22.45
-			M2 = 7.47
+			M1 = 14.75
+			M2 = 2.85
 
 		elif q == 4:
 
-			M1 = 22.45
-			M2 = 7.47
+			M1 = 13.95
+			M2 = 2.37
 
 		elif q == 5:
 
-			M1 = 22.45
-			M2 = 7.47
+			M1 = 12.81
+			M2 = 1.68
 
 		else: 
 
@@ -264,18 +276,18 @@ def get_thresholds(F, q):
 
 		elif q == 2:
 
-			M1 = 22.45
-			M2 = 7.47
+			M1 = 41.83
+			M2 = 19.10
 
 		elif q == 3:
 
-			M1 = 22.45
-			M2 = 7.47
+			M1 = 33.55
+			M2 = 14.1
 
 		elif q == 4:
 
-			M1 = 22.45
-			M2 = 7.47
+			M1 = 14.48
+			M2 = 2.69
 
 		elif q == 5:
 

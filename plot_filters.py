@@ -100,6 +100,11 @@ def explicit_euler(stepnumber, delta, x0, F):
 
 def integrate(integration_scheme, stepsize, start, stepnumber, t, h, F):
 
+	'''
+	This function formats it's input into a shape, that will be accepted from the choosen
+	integration scheme.
+	'''
+
 	if integration_scheme == 'euler':
 
 		return explicit_euler(stepnumber, stepsize, start, F)
@@ -110,7 +115,6 @@ def integrate(integration_scheme, stepsize, start, stepnumber, t, h, F):
 
 	else:
 		temp  = t*h
-		#temp1 = np.arange(temp, temp + stepsize*stepnumber, stepsize)
 		temp1 = np.linspace(temp, temp + stepsize*stepnumber, stepnumber)
 
 		return np.transpose(odeint(Lorenz96,start,temp1, args = (F,)))[:,stepnumber-1]
@@ -122,9 +126,13 @@ def integrate(integration_scheme, stepsize, start, stepnumber, t, h, F):
 #---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-# This function is the basic Kalman filter, I saves all process outcomes into an d x K x N matrix.
-
 def my_EnKF(Z, H, start, measure_noise, T, K, d, q, delta, integration_scheme, obs, F, adap_inf = 0, const_inf = 0):
+
+	'''
+	This function is the base of the ensemble kalman filter, it in each iteration it calls the functions
+	forecast and analysis to simulate to filter. During this function we also collect all sorts of usefull
+	statistics.
+	'''
 
 	M1, M2 = get_thresholds(F, q)
 	process = start
@@ -160,10 +168,11 @@ def my_EnKF(Z, H, start, measure_noise, T, K, d, q, delta, integration_scheme, o
 
 		lambda_adap = 0 
 
-		# We only want to save the data for Xi and Theta after the filter has stabilized
+		# We only want to save the data for Xi and Theta after the filter has stabilized. The sqrt() is because in this code we actually compare 
+		# Theta^2 with M_1^2.
 		if t > T//2:
 
-			average_Theta +=  Theta
+			average_Theta +=  np.sqrt(Theta)
 			average_Xi    += Xi 
 
 
@@ -174,8 +183,8 @@ def my_EnKF(Z, H, start, measure_noise, T, K, d, q, delta, integration_scheme, o
 
 			lambda_adap = Theta*(1+Xi)
 
-		C_hat = get_C_hat(V_hat, K, d, lambda_adap, rho)											    # Covariance matrix 
-		process = analyis(V_hat, C_hat, H, Z_ens, K, d, q)				 						# progress at time step n is saved in process matrix
+		C_hat = get_C_hat(V_hat, K, d, lambda_adap, rho)			# Covariance matrix 
+		process = analyis(V_hat, C_hat, H, Z_ens, K, d, q)			# progress at time step n is saved in process matrix
 		ev_process[:,t+1] = 1/K * np.sum(process, axis = 1) 	
 
 	average_Xi    = average_Xi*2/T
@@ -186,6 +195,14 @@ def my_EnKF(Z, H, start, measure_noise, T, K, d, q, delta, integration_scheme, o
 
 def forecast(V_0, d, K, t, delta, integration_scheme, obs, h, F):
 
+	'''
+	This function takes the posterior ensemble from the last step V_0, the system dimension d, the number of ensemble members K,
+	the current timestep t, the stepsize of the numeric integrator delta, the stepnumber of the numeric integration obs,
+	the numeric integration scheme intergation_scheme, the time between observations , and the turbulence regieme F.
+
+	It uses the integrate function the create the forecast ensemble V_hat = forecast.
+	'''
+
 	forecast = np.zeros((d,K))
 
 	for k in range(K):
@@ -195,42 +212,59 @@ def forecast(V_0, d, K, t, delta, integration_scheme, obs, h, F):
 
 	return forecast
 
-# generates a fitting ensmble out of our observation by adding noise 
+
 def generate_ensamble(Z, measure_noise, K, q, timestamp):
 
+	'''
+	This function takes the observation Z, the measurement noise expected value and variance measure_noise, 
+	the number of ensemble memebers K, and the number of observed components q.
+	It returns the pertubations of the observation Z_new = z_ens.
+	'''
+
 	Z_new = np.zeros((q,K))
+
 	for k in range(K):
+
 		Z_new[:,k] =  Z +  measure_noise[timestamp*(K + 1) + (k+1): timestamp*(K + 1) + (k + 1) + q]
+
 	return Z_new
 
-# upon recieving new signal information analysis determines to most likely current position based on our forecast and the new signal 
+
 def analyis(V_hat, C, H, Z, K, d, q):
 
+	'''
+	This function takes the forecast ensemble V_hat, the forecast covariance matrix C, the observation matrix H,
+	the ensemble of the observation Z_ens, the number of ensemble members K, the system dimension d, and the
+	number of observed components q.
+	It returns the posterior ensemble V, saved into process. 
+	'''
+
 	V     = np.zeros((d,K))
-	#temp1 = dot(C,np.transpose(H))
-	#temp2 = inv(np.eye(d) + np.dot(temp1, H))
+
 	for k in range(K):
+
 		V[:,k] =  V_hat[:,k] - dot(dot(dot(C,np.transpose(H)), inv(0.01*np.eye(q)+ dot(H, dot(C,np.transpose(H))))), dot(H,V_hat[:,k])- Z[:,k])
-		#V[:,k] = ( dot(temp2, V_hat[:,k]) + dot(dot(temp2,temp1),Z[:,k]) )
 
 	return V
 
+
 def get_C_hat(V_hat, K, d, lambda_adap, rho):
 
+	'''
+	This function takes the forecast ensemble V_hat, the number of ensemble members K, the system dimension d,
+	and the strenght of the adaptive infaltion lambda_adap.
+	It returns the forecast covariance matrix C_hat with the added adaptive and constant inflation.
+	'''
 
 	V_bar_hat = 1/K * np.sum(V_hat, axis = 1)
 	C_hat     = np.zeros((d,d))  
-	#print(V_hat, V_bar_hat, 'V hut und EW von V hut')
 
 	for k in range(K):
 
 		temp     = V_hat[:,k]-V_bar_hat
 		C_hat    += np.outer(temp,temp)
-		#print(temp[0], np.outer(temp,temp)[0,0], 'check for outer')
 
 	C_hat =  1/(K-1) * C_hat + (lambda_adap + rho)*np.eye(d)  
-	#print(lambda_adap)
-	#print(C_hat[0,0])
 
 	return C_hat 
 
@@ -243,6 +277,7 @@ def get_thresholds(F, q):
 
 	F = 4, 8, 16
 	q = 1,2,3,4,5
+	d = 5
 
 	any other values will go back to a default value, results may vary.
 	'''
@@ -255,23 +290,23 @@ def get_thresholds(F, q):
 
 		elif q == 2:
 
-			M1 = 22.45
-			M2 = 7.47
+			M1 = 17.02
+			M2 = 4.21
 
 		elif q == 3:
 
-			M1 = 22.45
-			M2 = 7.47
+			M1 = 14.75
+			M2 = 2.85
 
 		elif q == 4:
 
-			M1 = 22.45
-			M2 = 7.47
+			M1 = 13.95
+			M2 = 2.37
 
 		elif q == 5:
 
-			M1 = 22.45
-			M2 = 7.47
+			M1 = 12.81
+			M2 = 1.68
 
 		else: 
 
@@ -287,18 +322,18 @@ def get_thresholds(F, q):
 
 		elif q == 2:
 
-			M1 = 22.45
-			M2 = 7.47
+			M1 = 41.83
+			M2 = 19.10
 
 		elif q == 3:
 
-			M1 = 22.45
-			M2 = 7.47
+			M1 = 33.55
+			M2 = 14.1
 
 		elif q == 4:
 
-			M1 = 22.45
-			M2 = 7.47
+			M1 = 14.48
+			M2 = 2.69
 
 		elif q == 5:
 
@@ -422,7 +457,7 @@ def evaluate_pattern_correlation(U, V, T, U_bar, h):
 
 	for n in range(temp,T):
 		m = int(n/h)
-		temp1[n-temp] = (np.dot(V[:,m]-U_bar, U[:,m]- U_bar))/(np.linalg.norm(V[:,m]-U_bar, ord = 2) * np.linalg.norm(U[:,m]- U_bar, ord = 2))
+		temp1[n-temp] = (np.dot(V[:,m]-U_bar, U[:,m]- U_bar))/((np.linalg.norm(V[:,m]-U_bar, ord = 2) * np.linalg.norm(U[:,m]- U_bar, ord = 2)))
 
 	pattern_cor = 2/T * np.sum(temp1)
 
@@ -453,23 +488,27 @@ def evaluate_posterior_error (U,V,Time):
 #---------------------------------------------------------------------------------
 
 #+++++++++++++++ F value dependent estimates of equilibrium measure+++++++++++++++++
-
+'''
+An important note is, that You may have to adjust the value of sigma, if You observe more components. 
+The more components you observe the smaller the variance. A solution to this is to choose the first observation
+with a very small error for all components we observe. This is currently implemeted and can be found in init_values.
+'''
 F = 16                  # Forcing, i.e strength of turbulence
 d = 5                  # Number of particles
 
 
 if F == 4:
-	mu, sigma      = 1.22, 2 # 3.373  
+	mu, sigma      = 1.22, 3.373  
 	Benchmark_RMSE = 3.53	 
 	ymax           = 4              
 
 elif F == 8:
-	mu, sigma      = 2.27, 4 # 13.464 
+	mu, sigma      = 2.27, 13.464 
 	Benchmark_RMSE = 7.10
 	ymax           = 25
 
 elif F == 16:
-	mu, sigma      = 3.2,  3# 39.04
+	mu, sigma      = 3.2, 39.04
 	Benchmark_RMSE = 11.98
 	ymax 		   = 80
 
@@ -481,7 +520,7 @@ else:
 
 #+++++++++++++++++++++++++++++The Lorenz '96 model++++++++++++++++++++++++++++++++
 
-N = 100
+N = 10
 x0 = np.random.normal(mu, sigma, d)	  
 
 
@@ -511,7 +550,10 @@ else:
 
 
 
-#------------------------------ Now we start the N = 100 simulations and collect the according data for the 4 Filters-------------------------
+# ------------------------------ Now we start the N = 100 simulations and collect the according data for the 4 Filters-------------------------
+
+
+# These are all the statistics we want to collect over the comming trials.
 
 EnKF_divergencies = 0
 EnKF_AI_divergencies = 0
@@ -543,13 +585,15 @@ CAI_average_Xi = 0
 
 for n in range(N):
 
+	# Since this takes a long time, there is a print command to tell you how far we progressed.
 	print(f'Step {n+1} out of {N}.')
 
 	observation = np.array([dot(H, U[:, t]) + Error_matrix[t*(K + 1):t*(K + 1) + q, n] for t in range(Time)])
 
-	init_values = np.zeros((d,K)) + np.random.normal(mu, sigma, (d,K)) #Starting values of the Filter members
-	init_values[0:q,:] = observation[0]*np.ones(K)
+	init_values = np.zeros((d, K)) + np.random.normal(mu, sigma, (d, K)) #Starting values of the Filter members
 
+	# Here we set the values of the starting ensemble of all observed components to the observation with a small error.
+	init_values[0:q,:] = np.transpose(np.array([observation[0] for k in range(K)])) + np.random.normal(0, 0.01, (q, K))
 
 
 	EnKF_values, not_available_0, not_available_1, not_available_2 = my_EnKF(observation, H, init_values, Error_matrix[:,n], Time, K, d, q, delta, scheme, obs, F)
@@ -680,11 +724,13 @@ plt.show()
 #---------------------------------------------------------------------
 #----------------------plot of first 3 variables ---------------------
 #---------------------------------------------------------------------
+
+# An optinal 3 D visualization using the first 3 components.
 '''
 from mpl_toolkits.mplot3d import Axes3D
 fig = plt.figure()
 ax = fig.gca(projection='3d')
-ax.plot(Filter[0,:],Filter[1,:],Filter[2,:], 'r')
+ax.plot(post_error_CAI[0,:], post_error_CAI[1,:], post_error_CAI[2,:], 'r')
 ax.plot(signal[0,:],signal[1,:],signal[2,:])
 ax.set_xlabel('$x_1$')
 ax.set_ylabel('$x_2$')
