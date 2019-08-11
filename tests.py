@@ -8,6 +8,8 @@ import ENKF as kf
 import EnKF_CI as kf_ci
 import EnKF_AI as kf_ai
 import EnKF_CAI as kf_cai
+import threading 
+import shutil
 from numpy import dot
 from tkinter import ttk
 from scipy.integrate import odeint
@@ -60,7 +62,7 @@ def evaluate_pattern_correlation(U, V, T, U_bar, h):
 
 	for n in range(temp,T):
 		m = int(n/h)
-		temp1[n-temp] = (np.dot(V[:,m]-U_bar, U[:,m]- U_bar))/(np.linalg.norm(V[:,m]-U_bar, ord = 2) * np.linalg.norm(U[:,m]- U_bar, ord = 2))
+		temp1[n-temp] = (np.dot(V[:,m]-U_bar, U[:,m]- U_bar))/((np.linalg.norm(V[:,m]-U_bar, ord = 2) * np.linalg.norm(U[:,m]- U_bar, ord = 2)))
 
 	pattern_cor = 2/T * np.sum(temp1)
 
@@ -83,6 +85,8 @@ def evaluate_posterior_error (U,V,Time):
 		error[n] = np.linalg.norm((U[:,n]-V[:,n]), ord = 2)
 
 	return error
+
+
 
 # -----------------------------------------------------------------------------------------------------------------------
 # The following classes use TKinter to create a user-interface in order to simlify testing and changing of variables.
@@ -339,9 +343,10 @@ class no_inflation(tk.Frame):
 		K_label = ttk.Label(self, text = 'K:', font = medium)
 		K_label.grid(row = 6, column = 3, sticky = 'e', padx= 5)
 
-		Go = ttk.Button(self, text="Start Simulation", 
+		Go = ttk.Button(self, text="Start Simulation",
 		command = lambda: self.input_conversion(self.input_d.get(), self.input_T.get(), self.input_delta.get(), 
 			self.input_scheme.get(), self.input_q.get(), self.input_K.get(), self.input_F.get(), self.input_h.get(), 'EnKF'))
+		
 		Go.grid(row = 7, column = 2, columnspan = 3, pady = 5, sticky = 'nsew')
 
 
@@ -532,6 +537,11 @@ class no_inflation(tk.Frame):
 		else:
 			H = np.concatenate((np.eye(q), np.zeros((q,d-q))), axis = 1)
 
+		'''
+		Now we create the truth signal using the equilibrium of the different turbulence regimes
+		(these where calculated in equilibrium.py) and initiate the choosen filter with the start values.
+		'''	
+
 		if got_input_error == 0:
 
 			if F == 4:
@@ -556,7 +566,8 @@ class no_inflation(tk.Frame):
 			U = signal[:,0::obs]	
 			observation = np.array([dot(H,U[:,k]) + np.random.normal(measure_noise[0], measure_noise[1], q) for k in range(Time)])
 
-			start = np.random.normal(mu, sigma, (d,K))  
+			start = np.random.normal(mu, sigma, (d,K)) 
+			start[0:q,:] = np.transpose(np.array([observation[0] for k in range(K)])) + np.random.normal(0, 0.01, (q, K)) 
 
 
 
@@ -807,6 +818,10 @@ class no_inflation(tk.Frame):
 			signal = np.transpose(odeint(kf.Lorenz96, np.random.normal(mu,1,d), np.linspace(0,T,int(T/delta)), args = (F,)))
 			U = signal[:,0::obs]	
 			
+			'''
+			The statistics we are collecting.
+			'''
+
 			divergencies = 0
 			average_RMSE = 0
 			average_Cor = 0
@@ -827,6 +842,7 @@ class no_inflation(tk.Frame):
 				observation = np.array([dot(H,U[:,k]) + np.random.normal(measure_noise[0], measure_noise[1], q) for k in range(Time)])
 
 				start = np.random.normal(mu, sigma, (d,K))  
+				start[0:q,:] = np.transpose(np.array([observation[0] for k in range(K)])) + np.random.normal(0, 0.01, (q, K))
 
 				if filter_name == 'EnKF':
 
